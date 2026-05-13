@@ -113,6 +113,8 @@ canvas{display:block;width:100%;height:100%;cursor:crosshair}
 <div class="overlay hidden" id="settingsOverlay">
   <div class="settings-title">设 置</div>
   <div class="settings-row"><label>音效</label><button class="menu-btn sm on" id="sndToggle">开启</button></div>
+  <div class="settings-row"><label>背景音乐</label><button class="menu-btn sm on" id="bgmToggle">开启</button></div>
+  <div class="settings-row"><label>背景音乐音量</label><input type="range" id="bgmVolume" min="0" max="100" value="40" style="width:160px"></div>
   <div class="settings-row"><label>震动反馈</label><button class="menu-btn sm off" id="vibToggle">关闭</button></div>
   <div class="settings-divider"></div>
   <div class="settings-row">
@@ -131,7 +133,7 @@ canvas{display:block;width:100%;height:100%;cursor:crosshair}
 const CFG={WORLD_W:2400,WORLD_H:800};
 const W2=()=>W/2,H2=()=>H/2;
 let W,H,AC=null;
-const SET={sound:true,vibration:false};
+const SET={sound:true,bgm:true,bgmVolume:0.4,vibration:false};
 
 // ============================================================
 // ALIEN SPRITE
@@ -184,26 +186,24 @@ let settingsOpen=false,helpOpen=false;
 // ============================================================
 const S={
   phase:'menu',mode:'overview',
-  score:0,lives:5,combo:0,killsInWave:0,
+  score:0,lives:5,combo:0,killsInWave:0,killsTotal:0,shots:0,
   levelIdx:0,wave:1,
-  ammo:8,reloading:0,startTime:0,
+  ammo:8,reloading:0,startTime:0,gameTime:0,
   cx:1200,cy:380,zoom:1,tcx:1200,tcy:380,tzoom:1,
   recoilX:0,recoilY:0,muzzle:0,breath:3500,holdingBreath:0,
   aliens:[],fx:[],hits:[],peds:[],cars:[],
-  mx:0,my:0,cheatActive:0,
+  mx:0,my:0,cheatActive:0,misses:0,
   paused:0,waveTimer:0,
-  // the ONE counter that matters
-  aliensRemaining:0,
-  waveCleared:false, // true = last alien killed, timer → clearWave
-  // debug
+  aliensRemaining:0,waveTotal:0,
+  waveCleared:false,
   debugMsg:'',
 };
 function resetCounters(){
-  S.score=0;S.lives=5;S.combo=0;S.killsInWave=0;
+  S.score=0;S.lives=5;S.combo=0;S.killsInWave=0;S.killsTotal=0;S.shots=0;S.misses=0;
   S.levelIdx=0;S.wave=1;S.ammo=8;S.reloading=0;
-  S.startTime=Date.now();
+  S.startTime=Date.now();S.gameTime=0;
   S.recoilX=0;S.recoilY=0;S.muzzle=0;S.breath=3500;S.holdingBreath=0;
-  S.cheatActive=0;S.aliensRemaining=0;S.waveTimer=0;S.waveCleared=false;
+  S.cheatActive=0;S.aliensRemaining=0;S.waveTimer=0;S.waveCleared=false;S.waveTotal=0;
   S.aliens=[];S.fx=[];S.hits=[];S.peds=[];S.cars=[];
   S.paused=1;
   S.cx=1200;S.cy=380;S.zoom=1;S.tcx=1200;S.tcy=380;S.tzoom=1;
@@ -222,6 +222,40 @@ function play(id){if(!SET.sound)return;
   }catch(e){}
 }
 function vibe(){if(!SET.vibration)return;try{navigator.vibrate&&navigator.vibrate(30);}catch(e){}}
+
+// ============================================================
+// BACKGROUND MUSIC
+// ============================================================
+let bgmAudio=null;
+const BGM_FILES=[
+  '《低频轰鸣下的危险暗涌》开心的蓝莓果冻.mp3',
+  '《机械轰鸣下的危险警报》开心的蓝莓果冻.mp3',
+  '《狙击潜行：外星踪迹的紧张对峙》开心的蓝莓果冻.mp3',
+  '《狙击潜行：暗影中的外星猎杀》开心的蓝莓果冻.mp3'
+];
+function startBGM(levelIdx=0){
+  if(!SET.bgm||!SET.sound)return;
+  stopBGM();
+  try{
+    const audio=new Audio();
+    audio.src=BGM_FILES[Math.min(levelIdx,BGM_FILES.length-1)];
+    audio.loop=true;
+    audio.volume=SET.bgmVolume;
+    audio.addEventListener('error',()=>{console.log('BGM load failed');});
+    audio.addEventListener('loadedmetadata',()=>{audio.play().catch(()=>{});});
+    audio.play().catch(()=>{});
+    bgmAudio=audio;
+  }catch(e){console.log('BGM error:',e);}
+}
+function stopBGM(){
+  if(!bgmAudio)return;
+  try{
+    bgmAudio.pause();
+    bgmAudio.currentTime=0;
+    bgmAudio=null;
+  }catch(e){}
+}
+
 
 // ============================================================
 // COORDS
@@ -246,12 +280,12 @@ function spawnAliens(n){
   const l=LV[S.levelIdx],sp=buildSpots(l);
   if(!sp.length)return;
   const ct=Math.min(n,sp.length);
-  S.aliens=[];
+  S.aliens=[];S.killsInWave=0;
   for(let i=0;i<ct;i++){
     const s=sp[Math.floor(Math.random()*sp.length)],ci=Math.floor(Math.random()*l.cols.length),easy=ci===l.cols.length-1;
     S.aliens.push({x:s.x,y:s.y,sc:s.sc,color:l.cols[ci],easy,alive:true,die:0,peek:Math.random()*6.28,peekSp:(.008+Math.random()*.012)*l.spd,peekAm:easy?.4+Math.random()*.3:.15+Math.random()*.2,eye:Math.random()*6.28,move:Math.random()>.6?5+Math.random()*15:0,movePh:Math.random()*6.28,moveSp:.002+.003*Math.random(),bx:s.x,by:s.y});
   }
-  S.aliensRemaining=ct;
+  S.aliensRemaining=ct;S.waveTotal=ct;
   S.debugMsg='spawned '+ct+' aliens';
   console.log('SPAWNED '+ct+' aliens for wave '+S.wave);
 }
@@ -262,7 +296,7 @@ function spawnAliens(n){
 function shoot(){
   if(S.phase!=='playing'||S.paused||S.reloading||settingsOpen||helpOpen)return;
   if(S.ammo<=0){reload();return;}
-  S.ammo--;S.muzzle=10;play('shot');vibe();
+  S.ammo--;S.shots++;S.muzzle=10;play('shot');vibe();
   S.recoilY=-8+3*(Math.random()-.5);S.recoilX=3*(Math.random()-.5);
   const cw=s2w(W/2,H/2);let hit=false;
   for(let i=S.aliens.length-1;i>=0;i--){
@@ -270,14 +304,13 @@ function shoot(){
     const d=Math.hypot(cw.x-a.x,cw.y-a.y);
     if(d<(12*a.sc)*(.5+.5*Math.min(S.zoom/2.5,1))){
       a.alive=false;a.die=30;hit=true;
-      S.killsInWave++;S.combo++;
+      S.killsInWave++;S.killsTotal++;S.combo++;
       const pts=Math.round((a.easy?100:200)*(1+(S.combo-1)*.5));S.score+=pts;
       play('hit');play('scream');if(S.combo>=3)play('combo');
       const sw=w2s(a.x,a.y);
       for(let j=0;j<20;j++){const ang=Math.random()*6.28,spd=.5+Math.random()*4;S.fx.push({x:sw.x,y:sw.y,vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd-1,life:1,dec:.012+.02*Math.random(),color:a.color,sz:1.5+Math.random()*2.5});}
       S.hits.push({x:sw.x,y:sw.y,t:a.easy?`+${pts}`:`+${pts}`,c:a.easy?'#88ff88':'#ffcc00',life:1,vy:-1.2});
       S.aliens.splice(i,1);
-      // THE KEY check
       S.aliensRemaining--;
       console.log('KILLED alien! remaining='+S.aliensRemaining+' ali='+S.aliens.length);
       if(S.aliensRemaining<=0){
@@ -301,7 +334,15 @@ function clearWave(){
   if(S.phase!=='playing'){console.log('clearWave REJECTED');return;}
   S.wave++;
   console.log('clearWave wave now='+S.wave);
-  if(S.wave>3){S.levelIdx++;S.wave=1;if(S.levelIdx>=LV.length){gameWin();return;}}
+  if(S.wave>3){
+    S.levelIdx++;
+    S.wave=1;
+    if(S.levelIdx>=LV.length){
+      gameWin();
+      return;
+    }
+    startBGM(S.levelIdx);
+  }
   startWave();
 }
 function startWave(){
@@ -312,11 +353,13 @@ function startWave(){
   S.mode='overview';if(S.tzoom<.8||S.tzoom>1.8)S.tzoom=1;$('sniperHint').classList.add('show');
 }
 function finishWaveStart(){
-  console.log('finishWaveStart spawn aliens');
+  const base=4+S.levelIdx*2;
+  const count=Math.floor(Math.random()*(20-base+1))+base;
+  console.log('finishWaveStart spawn aliens: '+count);
   T.el.classList.remove('show');
   if(S.phase!=='playing')return;
   S.paused=0;
-  spawnAliens(3+S.wave*2+S.levelIdx);
+  spawnAliens(count);
   S.debugMsg='';
 }
 
@@ -325,24 +368,25 @@ function finishWaveStart(){
 // ============================================================
 function startGame(){
   resetCounters();
-  S.phase='playing';S.mode='overview';
+  S.phase='playing';S.mode='overview';startBGM(S.levelIdx);
   ov.menu.classList.add('hidden');ov.go.classList.add('hidden');ov.win.classList.add('hidden');ov.settings.classList.add('hidden');
   $('cornerBtns').style.display='flex';settingsOpen=false;helpOpen=false;helpPanel.classList.remove('show');
-  const l=LV[0];T.name.textContent=l.name;T.wave.textContent='第 1 波 | 消灭所有目标';T.el.classList.add('show');
+  const l=LV[S.levelIdx];T.name.textContent=l.name;T.wave.textContent='第 '+S.wave+' 波 | 消灭所有目标';T.el.classList.add('show');
   $('sniperHint').classList.add('show');
   S.paused=1;S.waveTimer=60;S.debugMsg='initial delay';
   console.log('startGame paused=1 waveTimer=60');
 }
 function startInitialWave(){
-  console.log('startInitialWave spawning 4');
+  const count=Math.floor(Math.random()*17)+4;
+  console.log('startInitialWave spawning '+count);
   T.el.classList.remove('show');
   if(S.phase!=='playing')return;
-  S.paused=0;spawnAliens(4);S.debugMsg='';
+  S.paused=0;spawnAliens(count);S.debugMsg='';
 }
 
 function restartLevel(){
   resetCounters();
-  S.phase='playing';S.mode='overview';
+  S.phase='playing';S.mode='overview';startBGM();
   ov.go.classList.add('hidden');ov.win.classList.add('hidden');ov.settings.classList.add('hidden');
   settingsOpen=false;helpOpen=false;helpPanel.classList.remove('show');
   const l=LV[S.levelIdx];T.name.textContent=l.name;T.wave.textContent='第 '+S.wave+' 波 | 消灭所有目标';T.el.classList.add('show');
@@ -350,22 +394,24 @@ function restartLevel(){
   S.paused=1;S.waveTimer=60;S.debugMsg='restart delay';
 }
 
-function gameOver(){S.phase='gameover';$('sniperHint').classList.remove('show');play('fail');showResult('go');}
-function gameWin(){S.phase='win';$('sniperHint').classList.remove('show');play('win');showResult('win');}
+function gameOver(){S.phase='gameover';stopBGM();$('sniperHint').classList.remove('show');play('fail');showResult('go');}
+function gameWin(){S.phase='win';startBGM(3);$('sniperHint').classList.remove('show');play('win');showResult('win');}
 function showResult(t){
-  const e=Math.floor((Date.now()-S.startTime)/1000),a=S.shots>0?Math.round(S.hits/S.shots*100):0,ss=S.lives>=4?'★★★':S.lives>=2?'★★':'★';
+  const e=Math.floor((Date.now()-S.startTime)/1000),a=S.shots>0?Math.round(S.killsTotal/S.shots*100):0,ss=S.lives>=4?'★★★':S.lives>=2?'★★':'★';
   $(t+'Stars').textContent=ss;$(t+'Score').textContent='得分: '+S.score;
-  $(t+'Detail').textContent='击杀 '+S.killsInWave+' · 命中率 '+a+'% · '+e+'s';ov[t].classList.remove('hidden');
+  $(t+'Detail').textContent='击杀 '+S.killsTotal+' · 命中率 '+a+'% · '+e+'s';ov[t].classList.remove('show');ov[t].classList.remove('hidden');
 }
-function goHome(){S.phase='menu';ov.menu.classList.remove('hidden');ov.go.classList.add('hidden');ov.win.classList.add('hidden');ov.settings.classList.add('hidden');$('cornerBtns').style.display='none';helpPanel.classList.remove('show');helpOpen=false;settingsOpen=false;}
+function goHome(){S.phase='menu';stopBGM();ov.menu.classList.remove('hidden');ov.go.classList.add('hidden');ov.win.classList.add('hidden');ov.settings.classList.add('hidden');$('cornerBtns').style.display='none';helpPanel.classList.remove('show');helpOpen=false;settingsOpen=false;}
 
 // ============================================================
 // SETTINGS
 // ============================================================
 function openSettings(){if(S.phase!=='playing')return;settingsOpen=true;helpOpen=false;helpPanel.classList.remove('show');S.paused=1;ov.settings.classList.remove('hidden');}
 function closeSettings(){settingsOpen=false;ov.settings.classList.add('hidden');if(S.phase==='playing')S.paused=0;}
-function toggleSound(){SET.sound=!SET.sound;const b=$('sndToggle');b.textContent=SET.sound?'开启':'关闭';b.className='menu-btn sm '+(SET.sound?'on':'off');if(SET.sound)play('combo');}
+function toggleSound(){SET.sound=!SET.sound;const b=$('sndToggle');b.textContent=SET.sound?'开启':'关闭';b.className='menu-btn sm '+(SET.sound?'on':'off');if(!SET.sound){stopBGM();}else if(SET.bgm&&S.phase==='playing'){startBGM();}if(SET.sound)play('combo');}
 function toggleVibe(){SET.vibration=!SET.vibration;const b=$('vibToggle');b.textContent=SET.vibration?'开启':'关闭';b.className='menu-btn sm '+(SET.vibration?'on':'off');if(SET.vibration){try{navigator.vibrate&&navigator.vibrate(100);}catch(e){}}}
+function toggleBgm(){SET.bgm=!SET.bgm;const b=$('bgmToggle');b.textContent=SET.bgm?'开启':'关闭';b.className='menu-btn sm '+(SET.bgm?'on':'off');if(SET.bgm&&SET.sound&&S.phase==='playing')startBGM();else stopBGM();}
+function setBgmVolume(v){SET.bgmVolume=v/100;if(bgmAudio)bgmAudio.volume=SET.bgmVolume;}
 
 // ============================================================
 // DRAW — WORLD
@@ -396,8 +442,28 @@ function drawAliens(){
     if(!a.alive){if(a.die>0){CX.save();CX.globalAlpha=a.die/30*.6;if(alienSprite)CX.drawImage(alienSprite,a.x-18,a.y-a.die*.3-18,36,36);CX.restore();a.die--;}continue;}
     a.peek+=a.peekSp;const peek=Math.sin(a.peek)*a.peekAm;if(a.move){a.movePh+=a.moveSp;a.x=a.bx+Math.sin(a.movePh)*a.move*peek;}a.eye+=.025;
     const s=18*a.sc;CX.save();CX.translate(a.x,a.y);let al=a.easy?.7+peek*.25:.3+peek*.4;al=Math.max(.2,Math.min(.95,al));CX.globalAlpha=al;
-    if(alienSprite){CX.drawImage(alienSprite,-s,-s,s*2,s*2);}else{CX.fillStyle=a.color;CX.beginPath();CX.ellipse(0,0,s*.5,s*.7,0,0,6.2832);CX.fill();CX.beginPath();CX.ellipse(0,-s*.5,s*.55,s*.4,0,0,6.2832);CX.fill();}
-    const gi=.5+Math.sin(a.eye)*.4;if(gi>.5){CX.globalAlpha=gi*.15;CX.fillStyle='#ff0';CX.beginPath();CX.arc(-s*.05,-s*.35,s*.3,0,6.2832);CX.fill();CX.beginPath();CX.arc(s*.05,-s*.35,s*.3,0,6.2832);CX.fill();}
+    if(alienSprite){
+      CX.drawImage(alienSprite,-s,-s,s*2,s*2);
+    }else{
+      const bodyH=s*1.2,bodyW=s*0.6;
+      CX.fillStyle=a.color;
+      CX.beginPath();CX.ellipse(0,s*0.3,bodyW,bodyH,0,0,6.2832);CX.fill();
+      CX.beginPath();CX.ellipse(0,-s*0.4,s*0.7,s*0.55,0,0,6.2832);CX.fill();
+      
+      const armSwing=Math.sin(Date.now()/500)*0.3;
+      CX.strokeStyle=a.color;CX.lineWidth=s*0.15;
+      CX.beginPath();CX.moveTo(-bodyW*0.8,s*0.1);CX.lineTo(-s*1.3,s*0.4+armSwing*s);CX.stroke();
+      CX.beginPath();CX.moveTo(bodyW*0.8,s*0.1);CX.lineTo(s*1.3,s*0.4-armSwing*s);CX.stroke();
+      
+      const legSwing=Math.sin(Date.now()/400)*0.3;
+      CX.beginPath();CX.moveTo(-s*0.2,s*1.4);CX.lineTo(-s*0.5,s*2.1+legSwing*s);CX.stroke();
+      CX.beginPath();CX.moveTo(s*0.2,s*1.4);CX.lineTo(s*0.5,s*2.1-legSwing*s);CX.stroke();
+      
+      CX.fillStyle='#000';CX.beginPath();CX.arc(-s*0.2,-s*0.35,s*0.18,0,6.2832);CX.fill();
+      CX.beginPath();CX.arc(s*0.2,-s*0.35,s*0.18,0,6.2832);CX.fill();
+      
+      const gi=.5+Math.sin(a.eye)*.4;if(gi>.5){CX.globalAlpha=gi*.15;CX.fillStyle='#ff0';CX.beginPath();CX.arc(-s*.2,-s*.35,s*.12,0,6.2832);CX.fill();CX.beginPath();CX.arc(s*.2,-s*.35,s*.12,0,6.2832);CX.fill();}
+    }
     CX.globalAlpha=1;CX.restore();
   }
 }
@@ -423,20 +489,23 @@ function drawHUD(){
   CX.textAlign='center';CX.fillStyle='#88bbff';CX.font='15px "Microsoft YaHei",sans-serif';CX.fillText(LV[S.levelIdx].name+' · 波'+S.wave+' · '+(S.mode==='sniper'?'狙击':'全景'),W/2,29);
   let h='';for(let i=0;i<S.lives;i++)h+='❤';CX.fillStyle='#ff4444';CX.textAlign='right';CX.font='15px Arial';CX.fillText(h,W-14,29);
 
-  // HUGE debug counter — IMPOSSIBLE to miss
   CX.fillStyle='rgba(0,0,0,.8)';CX.fillRect(W/2-120,H-70,240,28);
-  CX.fillStyle='#ff0';CX.font='bold 16px "Microsoft YaHei",sans-serif';CX.textAlign='center';CX.fillText('已杀:'+S.killsInWave+' 剩余:'+S.aliensRemaining+' 计时:'+S.waveTimer+' '+S.debugMsg,W/2,H-46);
+  const elapsed=Math.floor(S.gameTime/1000);
+  CX.fillStyle='#ff0';CX.font='bold 16px "Microsoft YaHei",sans-serif';CX.textAlign='center';CX.fillText('已杀:'+S.killsInWave+' 剩余:'+S.aliensRemaining+' 计时:'+elapsed+'s '+S.debugMsg,W/2,H-46);
 
-  // Alien counter dots
   CX.fillStyle='rgba(0,0,0,.4)';CX.fillRect(W/2-80,48,160,22);
-  for(let i=0;i<S.killsInWave;i++){CX.fillStyle='#4f4';CX.beginPath();CX.arc(W/2-70+i*14,59,5,0,6.2832);CX.fill();}
-  const rlim=Math.min(S.aliensRemaining,10);
-  for(let i=0;i<rlim;i++){CX.fillStyle='#f44';CX.beginPath();CX.arc(W/2-70+(S.killsInWave+i)*14,59,5,0,6.2832);CX.fill();}
+  const totalDots=Math.min(S.waveTotal,10);
+  for(let i=0;i<totalDots;i++){
+    if(i<S.killsInWave){
+      CX.fillStyle='#4f4';
+    }else{
+      CX.fillStyle='#f44';
+    }
+    CX.beginPath();CX.arc(W/2-70+i*14,59,5,0,6.2832);CX.fill();
+  }
 
-  // Ammo
   if(S.mode==='sniper'){CX.textAlign='left';CX.fillStyle=S.ammo<=2?'#ff4444':'#aabbcc';CX.font='bold 16px "Microsoft YaHei",sans-serif';CX.fillText(S.reloading?'装弹...':'弹: '+'●'.repeat(S.ammo)+'○'.repeat(8-S.ammo),14,H-14);}
 
-  // Hit labels & particles
   for(let i=S.hits.length-1;i>=0;i--){const m=S.hits[i];m.y+=m.vy;m.life-=.02;if(m.life<=0){S.hits.splice(i,1);continue;}CX.save();CX.globalAlpha=m.life;CX.fillStyle=m.c;CX.font='bold 20px "Microsoft YaHei",sans-serif';CX.textAlign='center';CX.fillText(m.t,m.x,m.y);CX.restore();}
   for(let i=S.fx.length-1;i>=0;i--){const p=S.fx[i];p.x+=p.vx;p.y+=p.vy;p.vy+=.12;p.life-=p.dec;if(p.life<=0){S.fx.splice(i,1);continue;}CX.save();CX.globalAlpha=p.life;CX.fillStyle=p.color;CX.fillRect(p.x-p.sz/2,p.y-p.sz/2,p.sz,p.sz);CX.restore();}
 }
@@ -479,7 +548,7 @@ function loop(){
           }
         }
       }
-      if(!S.paused){updateDynamic();}else{updateDynamic();}
+      if(!S.paused){updateDynamic();S.gameTime+=16;}else{updateDynamic();}
       updateCamera();
       if(S.mode==='overview')drawOverview();else drawScope();
       drawHUD();
@@ -517,6 +586,8 @@ $('retryHomeBtn').addEventListener('click',goHome);
 $('againBtn').addEventListener('click',startGame);
 $('settingsBtn').addEventListener('click',openSettings);
 $('sndToggle').addEventListener('click',toggleSound);
+$('bgmToggle').addEventListener('click',toggleBgm);
+$('bgmVolume').addEventListener('input',e=>setBgmVolume(e.target.value));
 $('vibToggle').addEventListener('click',toggleVibe);
 $('contBtn').addEventListener('click',closeSettings);
 $('restartBtn').addEventListener('click',()=>{closeSettings();restartLevel();});
