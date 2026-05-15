@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>狙击外星人 v2.6</title>
+<title>狙击外星人 v2.8</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;user-select:none}
 html,body{width:100%;height:100%;background:#000;overflow:hidden}
@@ -90,7 +90,7 @@ canvas{display:block;width:100%;height:100%;cursor:crosshair}
 <div class="overlay" id="menuOverlay">
   <div class="menu-title">狙 击 外 星 人</div>
   <div class="menu-sub">扫描区域 · 发现目标 · 一枪毙敌</div>
-  <div class="menu-controls"><span>鼠标</span> 环视 · <span>滚轮</span> 缩放 · <span>T</span> 切换镜 · <span>左键</span> 射击<br><span>R</span> 装弹 · <span>Shift</span> 屏息</div>
+  <div class="menu-controls"><span>鼠标</span> 环视 · <span>滚轮</span> 缩放 · <span>T</span> 切换镜 · <span>左键</span> 射击<br><span>R</span> 装弹 · <span>Shift</span> 屏息 · <span>ESC</span> 设置 · <span>H</span> 帮助</div>
   <button class="menu-btn" id="startBtn">开 始 任 务</button>
   <div class="menu-footer">— 消灭所有外星人，即可通关 —</div>
 </div>
@@ -123,7 +123,7 @@ canvas{display:block;width:100%;height:100%;cursor:crosshair}
     <button class="menu-btn sm outline" id="homeBtn">返回主页</button>
   </div>
   <div class="settings-divider"></div>
-  <div style="color:#556688;font:13px 'Microsoft YaHei',sans-serif;text-align:center">开发者: iggy<br>v2.6 · 2026</div>
+  <div style="color:#556688;font:13px 'Microsoft YaHei',sans-serif;text-align:center">开发者: iggy<br>v2.8 · 2026</div>
 </div>
 
 <script>
@@ -152,23 +152,32 @@ function loadAlienSprite(cb){
 }
 
 // ============================================================
+// BACKGROUND IMAGES
+// ============================================================
+const bgImages={};
+function loadBgImages(cb){
+  const files=['游戏背景1.png','游戏背景2.png','游戏背景3.png'];
+  let loaded=0;
+  files.forEach(fn=>{
+    const img=new Image();
+    img.onload=()=>{
+      bgImages[fn]=img;
+      if(++loaded>=files.length&&cb)cb();
+    };
+    img.onerror=()=>{
+      if(++loaded>=files.length&&cb)cb();
+    };
+    img.src=fn;
+  });
+}
+
+// ============================================================
 // LEVELS (simplified for debugging)
 // ============================================================
 const LV=[
-  {name:'城市街道',sky:['#1a2040','#2a3050','#3a4060'],ground:'#3a3a3a',
-   bld:[{x:60,y:160,w:190,h:340,c:'#3b3b4e',win:1,roof:'flat',shop:'小吃摊'},{x:280,y:120,w:160,h:380,c:'#2d2d44',win:1,roof:'flat'},{x:480,y:150,w:180,h:350,c:'#3b3b4e',win:1,roof:'flat',shop:'杂货铺'},{x:700,y:110,w:170,h:390,c:'#2d2d44',win:1,roof:'flat'},{x:910,y:140,w:190,h:360,c:'#3b3b4e',win:1,roof:'flat',shop:'理发店'}],
-   tree:[{x:40,y:400,r:48},{x:260,y:380,r:42},{x:680,y:390,r:45},{x:880,y:385,r:40},{x:1120,y:395,r:44}],
-   bush:[{x:20,y:520,r:28},{x:240,y:530,r:25},{x:460,y:525,r:26},{x:660,y:530,r:28},{x:860,y:525,r:24},{x:1060,y:530,r:26},{x:1160,y:525,r:24}],
-   cols:['#3b3b4e','#2d2d44','#ffff66'],spd:1},
-  {name:'公园绿地',sky:['#0a2030','#1a3040','#2a4050'],ground:'#2a4a2a',
-   bld:[{x:500,y:300,w:200,h:200,c:'#5a4a3a',win:1,roof:'point'}],
-   tree:[{x:60,y:200,r:70},{x:200,y:160,r:76},{x:340,y:230,r:62},{x:670,y:180,r:78},{x:820,y:220,r:66},{x:960,y:170,r:74},{x:1100,y:200,r:64}],
-   bush:[{x:30,y:490,r:44},{x:180,y:505,r:48},{x:340,y:495,r:42},{x:520,y:510,r:50},{x:680,y:495,r:44},{x:840,y:505,r:48},{x:1000,y:490,r:42},{x:1140,y:500,r:44}],
-   cols:['#2a4a2a','#3a5a3a','#ffff66'],spd:1.15},
-  {name:'森林深处',sky:['#0a1a0a','#142814','#1e3a1e'],ground:'#1a2a14',
-   tree:[{x:40,y:170,r:82},{x:180,y:210,r:66},{x:340,y:140,r:90},{x:500,y:230,r:68},{x:660,y:170,r:84},{x:800,y:220,r:70},{x:940,y:150,r:82},{x:1080,y:200,r:66}],
-   bush:[{x:20,y:480,r:54},{x:160,y:500,r:50},{x:340,y:485,r:56},{x:520,y:505,r:52},{x:710,y:480,r:54},{x:870,y:500,r:50},{x:1020,y:485,r:50}],
-   cols:['#1a2a14','#2a3a24','#ffff66'],spd:1.35},
+  {name:'城市街道',bg:'游戏背景1.png',cols:['#3b3b4e','#2d2d44','#ffff66'],spd:1},
+  {name:'公园绿地',bg:'游戏背景2.png',cols:['#2a4a2a','#3a5a3a','#ffff66'],spd:1.15},
+  {name:'森林深处',bg:'游戏背景3.png',cols:['#1a2a14','#2a3a24','#ffff66'],spd:1.35},
 ];
 
 // ============================================================
@@ -187,23 +196,23 @@ let settingsOpen=false,helpOpen=false;
 const S={
   phase:'menu',mode:'overview',
   score:0,lives:5,combo:0,killsInWave:0,killsTotal:0,shots:0,
-  levelIdx:0,wave:1,
-  ammo:8,reloading:0,startTime:0,gameTime:0,
+  levelIdx:0,wave:1,lastWave:1,
+  ammo:8,reloading:0,startTime:0,gameTime:0,timeLeft:300,
   cx:1200,cy:380,zoom:1,tcx:1200,tcy:380,tzoom:1,
   recoilX:0,recoilY:0,muzzle:0,breath:3500,holdingBreath:0,
   aliens:[],fx:[],hits:[],peds:[],cars:[],
   mx:0,my:0,cheatActive:0,misses:0,
   paused:0,waveTimer:0,
   aliensRemaining:0,waveTotal:0,
-  waveCleared:false,
+  waveCleared:false,showHelpAliens:false,
   debugMsg:'',
 };
 function resetCounters(){
   S.score=0;S.lives=5;S.combo=0;S.killsInWave=0;S.killsTotal=0;S.shots=0;S.misses=0;
   S.levelIdx=0;S.wave=1;S.ammo=8;S.reloading=0;
-  S.startTime=Date.now();S.gameTime=0;
+  S.startTime=Date.now();S.gameTime=0;S.timeLeft=300;
   S.recoilX=0;S.recoilY=0;S.muzzle=0;S.breath=3500;S.holdingBreath=0;
-  S.cheatActive=0;S.aliensRemaining=0;S.waveTimer=0;S.waveCleared=false;S.waveTotal=0;
+  S.cheatActive=0;S.aliensRemaining=0;S.waveTimer=0;S.waveCleared=false;S.waveTotal=0;S.showHelpAliens=false;
   S.aliens=[];S.fx=[];S.hits=[];S.peds=[];S.cars=[];
   S.paused=1;
   S.cx=1200;S.cy=380;S.zoom=1;S.tcx=1200;S.tcy=380;S.tzoom=1;
@@ -218,7 +227,7 @@ function play(id){if(!SET.sound)return;
     if(!AC)AC=new(window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume();const a=AC,t=a.currentTime;
     const osc=(f,e,v,d,ty='sine',dl=0)=>{const o=a.createOscillator();o.type=ty;o.frequency.setValueAtTime(f,t+dl);if(e)o.frequency.exponentialRampToValueAtTime(e,t+dl+d);const g=a.createGain();g.gain.setValueAtTime(v,t+dl);g.gain.exponentialRampToValueAtTime(.001,t+dl+d);o.connect(g);g.connect(a.destination);o.start(t+dl);o.stop(t+dl+d+.01);};
     const noise=(v,d,dl=0)=>{const len=a.sampleRate*d;if(len<=0||len>96000)return;const b=a.createBuffer(1,len,a.sampleRate),buf=b.getChannelData(0);for(let i=0;i<len;i++)buf[i]=(Math.random()*2-1)*Math.pow(1-i/len,2);const n=a.createBufferSource();n.buffer=b;const g=a.createGain();g.gain.setValueAtTime(v,t+dl);g.gain.exponentialRampToValueAtTime(.001,t+dl+d);n.connect(g);g.connect(a.destination);n.start(t+dl);};
-    if(id==='shot'){osc(120,30,.2,.18,'sawtooth');noise(.1,.08);}else if(id==='hit')osc(600,200,.15,.18);else if(id==='scream'){osc(800,100,.1,.25,'sawtooth');osc(600,80,.08,.3,'square',.05);noise(.06,.15,.1);}else if(id==='miss')osc(180,180,.06,.07);else if(id==='reload'){for(let i=0;i<3;i++)osc(600+i*100,0,.04,.05,'square',i*.07);}else if(id==='combo')osc(880,1100,.08,.12);else if(id==='fail'){for(let i=0;i<4;i++)osc(300-i*50,0,.08,.15,'sawtooth',i*.18);}else if(id==='win')osc(523,0,.1,.28);
+    if(id==='shot'){osc(120,30,.2,.18,'sawtooth');noise(.1,.08);}else if(id==='hit')osc(600,200,.15,.18);else if(id==='scream'){osc(800,100,.1,.25,'sawtooth');osc(600,80,.08,.3,'square',.05);noise(.06,.15,.1);}else if(id==='miss')osc(180,180,.06,.07);else if(id==='reload'){for(let i=0;i<3;i++)osc(600+i*100,0,.04,.05,'square',i*.07);}else if(id==='combo')osc(880,1100,.08,.12);else if(id==='fail'){for(let i=0;i<4;i++)osc(300-i*50,0,.08,.15,'sawtooth',i*.18);}else if(id==='win')osc(523,0,.1,.28);else if(id==='tick'){osc(800,800,.05,.05);}
   }catch(e){}
 }
 function vibe(){if(!SET.vibration)return;try{navigator.vibrate&&navigator.vibrate(30);}catch(e){}}
@@ -267,13 +276,12 @@ function s2w(x,y){return{x:(x-W/2)/S.zoom+S.cx,y:(y-H/2)/S.zoom+S.cy}}
 // SPAWN
 // ============================================================
 function buildSpots(lv){
-  const sp=[],sx=CFG.WORLD_W/1200,sy=CFG.WORLD_H/800;
-  if(lv.bld)lv.bld.forEach(b=>{
-    if(b.win){const r=Math.floor(b.h/55),c=Math.floor((b.w-20)/35);for(let i=1;i<r;i++)for(let j=0;j<c;j++)sp.push({x:(b.x+15+j*34)*sx,y:(b.y+15+i*48)*sy,sc:.6+Math.random()*.4});}
-    sp.push({x:(b.x+b.w*(.2+Math.random()*.6))*sx,y:(b.y-8)*sy,sc:.6+Math.random()*.3});
-  });
-  if(lv.tree)lv.tree.forEach(t=>sp.push({x:(t.x+(Math.random()-.5)*t.r*.3)*sx,y:(t.y+t.r*.35)*sy,sc:.6+Math.random()*.4}));
-  if(lv.bush)lv.bush.forEach(b=>{for(let i=0;i<2;i++)sp.push({x:(b.x+(Math.random()-.5)*b.r*.5)*sx,y:(b.y+(Math.random()-.5)*b.r*.3)*sy,sc:.5+Math.random()*.3});});
+  const sp=[],margin=100;
+  for(let i=0;i<50;i++){
+    const x=margin+Math.random()*(CFG.WORLD_W-margin*2);
+    const y=margin+Math.random()*(CFG.WORLD_H-margin*2);
+    sp.push({x:x,y:y,sc:.5+Math.random()*.5});
+  }
   return sp;
 }
 function spawnAliens(n){
@@ -333,6 +341,7 @@ function clearWave(){
   console.log('clearWave ENTERED phase='+S.phase+' wave='+S.wave);
   if(S.phase!=='playing'){console.log('clearWave REJECTED');return;}
   S.wave++;
+  S.timeLeft=300;
   console.log('clearWave wave now='+S.wave);
   if(S.wave>3){
     S.levelIdx++;
@@ -381,6 +390,7 @@ function startInitialWave(){
   console.log('startInitialWave spawning '+count);
   T.el.classList.remove('show');
   if(S.phase!=='playing')return;
+  S.timeLeft=300;
   S.paused=0;spawnAliens(count);S.debugMsg='';
 }
 
@@ -409,6 +419,7 @@ function goHome(){S.phase='menu';stopBGM();ov.menu.classList.remove('hidden');ov
 function openSettings(){if(S.phase!=='playing')return;settingsOpen=true;helpOpen=false;helpPanel.classList.remove('show');S.paused=1;ov.settings.classList.remove('hidden');}
 function closeSettings(){settingsOpen=false;ov.settings.classList.add('hidden');if(S.phase==='playing')S.paused=0;}
 function toggleSound(){SET.sound=!SET.sound;const b=$('sndToggle');b.textContent=SET.sound?'开启':'关闭';b.className='menu-btn sm '+(SET.sound?'on':'off');if(!SET.sound){stopBGM();}else if(SET.bgm&&S.phase==='playing'){startBGM();}if(SET.sound)play('combo');}
+function toggleHelp(){if(settingsOpen)return;if(S.phase==='playing')S.paused=1;helpOpen=!helpOpen;helpPanel.classList.toggle('show',helpOpen);S.showHelpAliens=helpOpen;if(!helpOpen&&S.phase==='playing')S.paused=0;}
 function toggleVibe(){SET.vibration=!SET.vibration;const b=$('vibToggle');b.textContent=SET.vibration?'开启':'关闭';b.className='menu-btn sm '+(SET.vibration?'on':'off');if(SET.vibration){try{navigator.vibrate&&navigator.vibrate(100);}catch(e){}}}
 function toggleBgm(){SET.bgm=!SET.bgm;const b=$('bgmToggle');b.textContent=SET.bgm?'开启':'关闭';b.className='menu-btn sm '+(SET.bgm?'on':'off');if(SET.bgm&&SET.sound&&S.phase==='playing')startBGM();else stopBGM();}
 function setBgmVolume(v){SET.bgmVolume=v/100;if(bgmAudio)bgmAudio.volume=SET.bgmVolume;}
@@ -426,12 +437,14 @@ function drawTree(t){const sx=CFG.WORLD_W/1200,sy=CFG.WORLD_H/800,tx=t.x*sx,ty=t
   [{dx:0,dy:-t.r*.3*sy,r:t.r*.55},{dx:-t.r*.22*sx,dy:-t.r*.1*sy,r:t.r*.4},{dx:t.r*.22*sx,dy:-t.r*.15*sy,r:t.r*.38}].forEach((l,i)=>{CX.fillStyle=['#2a6a2a','#1a5a1a','#3a7a3a'][i];CX.beginPath();CX.arc(tx+l.dx,ty+l.dy,l.r*sx,0,6.2832);CX.fill();});
 }
 function drawBush(b){const sx=CFG.WORLD_W/1200,sy=CFG.WORLD_H/800,bx=b.x*sx,by=b.y*sy,br=b.r*sx;CX.fillStyle='#2a6a2a';CX.beginPath();CX.arc(bx,by,br,0,6.2832);CX.fill();CX.fillStyle='#1a5a1a';CX.beginPath();CX.arc(bx+br*.3,by-br*.12,br*.55,0,6.2832);CX.fill();}
-function drawWorld(lv){const sx=CFG.WORLD_W/1200,sy=CFG.WORLD_H/800,skyH=CFG.WORLD_H*.55;
-  const g=CX.createLinearGradient(0,0,0,skyH);lv.sky.forEach((c,i)=>g.addColorStop(i/(lv.sky.length-1),c));CX.fillStyle=g;CX.fillRect(0,0,CFG.WORLD_W,skyH);
-  CX.fillStyle='rgba(255,255,200,.45)';CX.beginPath();CX.arc(CFG.WORLD_W*.85,skyH*.18,28*sx,0,6.2832);CX.fill();
-  CX.fillStyle='#2a3a2a';for(let i=0;i<5;i++){const hx=i*CFG.WORLD_W/5,hh=CFG.WORLD_H*.1+Math.sin(i*1.3)*CFG.WORLD_H*.05;CX.beginPath();CX.moveTo(hx-120,CFG.WORLD_H*.55);CX.quadraticCurveTo(hx+CFG.WORLD_W/10,CFG.WORLD_H*.55-hh,hx+CFG.WORLD_W/5+120,CFG.WORLD_H*.55);CX.fill();}
-  const gY=CFG.WORLD_H*.55;CX.fillStyle=lv.ground;CX.fillRect(0,gY,CFG.WORLD_W,CFG.WORLD_H-gY);
-  if(lv.bld)lv.bld.forEach(b=>drawBuilding(b));if(lv.tree)lv.tree.forEach(t=>drawTree(t));if(lv.bush)lv.bush.forEach(b=>drawBush(b));
+function drawWorld(lv){
+  const bg=bgImages[lv.bg];
+  if(bg){
+    CX.drawImage(bg,0,0,CFG.WORLD_W,CFG.WORLD_H);
+  }else{
+    CX.fillStyle='#1a1a2e';CX.fillRect(0,0,CFG.WORLD_W,CFG.WORLD_H);
+    CX.fillStyle='#333';CX.font='20px Arial';CX.textAlign='center';CX.fillText('加载背景中...',CFG.WORLD_W/2,CFG.WORLD_H/2);
+  }
 }
 
 // ============================================================
@@ -464,6 +477,14 @@ function drawAliens(){
       
       const gi=.5+Math.sin(a.eye)*.4;if(gi>.5){CX.globalAlpha=gi*.15;CX.fillStyle='#ff0';CX.beginPath();CX.arc(-s*.2,-s*.35,s*.12,0,6.2832);CX.fill();CX.beginPath();CX.arc(s*.2,-s*.35,s*.12,0,6.2832);CX.fill();}
     }
+    if(S.showHelpAliens){
+      const pulse=Math.sin(Date.now()/300)*3+8;
+      CX.strokeStyle='#ff0000';
+      CX.lineWidth=5;
+      CX.beginPath();
+      CX.arc(0,0,s+pulse,0,6.2832);
+      CX.stroke();
+    }
     CX.globalAlpha=1;CX.restore();
   }
 }
@@ -490,8 +511,9 @@ function drawHUD(){
   let h='';for(let i=0;i<S.lives;i++)h+='❤';CX.fillStyle='#ff4444';CX.textAlign='right';CX.font='15px Arial';CX.fillText(h,W-14,29);
 
   CX.fillStyle='rgba(0,0,0,.8)';CX.fillRect(W/2-120,H-70,240,28);
-  const elapsed=Math.floor(S.gameTime/1000);
-  CX.fillStyle='#ff0';CX.font='bold 16px "Microsoft YaHei",sans-serif';CX.textAlign='center';CX.fillText('已杀:'+S.killsInWave+' 剩余:'+S.aliensRemaining+' 计时:'+elapsed+'s '+S.debugMsg,W/2,H-46);
+  const timeLeft=Math.floor(S.timeLeft);
+  const timeColor=timeLeft<=20?'#ff0000':'#ff0';
+  CX.fillStyle=timeColor;CX.font='bold 16px "Microsoft YaHei",sans-serif';CX.textAlign='center';CX.fillText('已杀:'+S.killsInWave+' 剩余:'+S.aliensRemaining+' 计时:'+timeLeft+'s '+S.debugMsg,W/2,H-46);
 
   CX.fillStyle='rgba(0,0,0,.4)';CX.fillRect(W/2-80,48,160,22);
   const totalDots=Math.min(S.waveTotal,10);
@@ -548,7 +570,25 @@ function loop(){
           }
         }
       }
-      if(!S.paused){updateDynamic();S.gameTime+=16;}else{updateDynamic();}
+      if(!S.paused){
+      updateDynamic();
+      S.gameTime+=16;
+      if(S.lastWave!==S.wave){
+        S.timeLeft=300;
+        S.lastWave=S.wave;
+      }
+      const lastTime=Math.floor(S.timeLeft);
+      S.timeLeft=Math.max(0,S.timeLeft-16/1000);
+      const currTime=Math.floor(S.timeLeft);
+      if(currTime<=20&&lastTime!==currTime){
+        play('tick');
+      }
+      if(S.timeLeft<=0){
+        gameOver();
+      }
+    }else{
+      updateDynamic();
+    }
       updateCamera();
       if(S.mode==='overview')drawOverview();else drawScope();
       drawHUD();
@@ -577,7 +617,9 @@ document.addEventListener('keydown',e=>{const k=e.key;
   if(k==='Escape'){openSettings();return;}
   if(k==='t'||k==='T'){e.preventDefault();toggleMode();}
   if((k==='r'||k==='R')&&S.phase==='playing'&&!S.reloading&&S.ammo<8)reload();
-  if(k==='Shift')S.holdingBreath=true;});
+  if(k==='Shift')S.holdingBreath=true;
+  if(k==='h'||k==='H'){e.preventDefault();toggleHelp();}
+});
 document.addEventListener('keyup',e=>{if(e.key==='Shift')S.holdingBreath=false;});
 
 $('startBtn').addEventListener('click',startGame);
@@ -592,8 +634,8 @@ $('vibToggle').addEventListener('click',toggleVibe);
 $('contBtn').addEventListener('click',closeSettings);
 $('restartBtn').addEventListener('click',()=>{closeSettings();restartLevel();});
 $('homeBtn').addEventListener('click',()=>{closeSettings();goHome();});
-$('helpBtn').addEventListener('click',()=>{if(settingsOpen)return;if(S.phase==='playing')S.paused=1;helpOpen=!helpOpen;helpPanel.classList.toggle('show',helpOpen);if(!helpOpen&&S.phase==='playing')S.paused=0;});
-$('closeHelp').addEventListener('click',()=>{helpOpen=false;helpPanel.classList.remove('show');if(S.phase==='playing')S.paused=0;});
+$('helpBtn').addEventListener('click',()=>{if(settingsOpen)return;if(S.phase==='playing')S.paused=1;helpOpen=!helpOpen;helpPanel.classList.toggle('show',helpOpen);S.showHelpAliens=helpOpen;if(!helpOpen&&S.phase==='playing')S.paused=0;});
+$('closeHelp').addEventListener('click',()=>{helpOpen=false;helpPanel.classList.remove('show');S.showHelpAliens=false;if(S.phase==='playing')S.paused=0;});
 $('payWx').addEventListener('click',()=>{alert('[微信支付接口]\n\n收款方尚未配置\n\n请在代码中更新 PAYMENT_CONFIG');});
 $('payAli').addEventListener('click',()=>{alert('[支付宝支付接口]\n\n收款方尚未配置\n\n请在代码中更新 PAYMENT_CONFIG');});
 document.addEventListener('click',e=>{if(helpOpen&&!helpPanel.contains(e.target)&&e.target!==$('helpBtn')){helpOpen=false;helpPanel.classList.remove('show');if(S.phase==='playing')S.paused=0;}});
@@ -604,8 +646,21 @@ document.addEventListener('click',e=>{if(helpOpen&&!helpPanel.contains(e.target)
 W=window.innerWidth;H=window.innerHeight;CV.width=W;CV.height=H;
 window.addEventListener('resize',()=>{W=window.innerWidth;H=window.innerHeight;CV.width=W;CV.height=H;});
 S.cx=1200;S.cy=380;S.zoom=1;S.tcx=1200;S.tcy=380;S.tzoom=1;
-loadAlienSprite(()=>{console.log('Sprite loaded');requestAnimationFrame(loop);});
-setTimeout(()=>{if(!alienSprite){console.log('Fallback start');requestAnimationFrame(loop);}},3000);
+
+let resourcesLoaded=0;
+function checkReady(){
+  if(++resourcesLoaded>=2){
+    console.log('All resources loaded');
+    requestAnimationFrame(loop);
+  }
+}
+
+loadAlienSprite(()=>{console.log('Sprite loaded');checkReady();});
+loadBgImages(()=>{console.log('Background images loaded');checkReady();});
+
+setTimeout(()=>{
+  if(resourcesLoaded<2){console.log('Fallback start');requestAnimationFrame(loop);}
+},3000);
 </script>
 </body>
 </html>
