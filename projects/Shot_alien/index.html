@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>狙击外星人 v2.8</title>
+<title>狙击外星人 v2.9</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;user-select:none}
 html,body{width:100%;height:100%;background:#000;overflow:hidden}
@@ -73,7 +73,7 @@ canvas{display:block;width:100%;height:100%;cursor:crosshair}
 <div class="sniper-hint" id="sniperHint">按 T 键切换狙击镜</div>
 
 <div class="corner-btns" id="cornerBtns">
-  <button class="corner-btn help-btn" id="helpBtn" title="寻求帮助">?</button>
+  <button class="corner-btn help-btn" id="helpBtn" title="寻求帮助" style="display: none">?</button>
   <button class="corner-btn" id="settingsBtn" title="设置">*</button>
 </div>
 
@@ -110,12 +110,36 @@ canvas{display:block;width:100%;height:100%;cursor:crosshair}
   <button class="menu-btn" id="againBtn">再 玩 一 次</button>
 </div>
 
+<div class="overlay hidden" id="passwordOverlay">
+  <div class="settings-title" style="font-size:28px">开发者验证</div>
+  <div class="settings-row"><label>请输入密码</label></div>
+  <div class="settings-row"><input type="password" id="devPassword" style="width:160px;font:16px Arial;padding:8px 12px;border-radius:6px;border:1px solid #556688;background:#1a1a2e;color:#fff;text-align:center" maxlength="20"></div>
+  <div class="settings-row">
+    <button class="menu-btn sm" id="passwordSubmit">确认</button>
+    <button class="menu-btn sm outline" id="passwordCancel">取消</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="jumpOverlay">
+  <div class="settings-title" style="font-size:28px">跳转关卡</div>
+  <div class="settings-row"><label>当前关卡: <span id="currentLevelDisplay"></span></label></div>
+  <div class="settings-row"><label>跳转至关卡 (1-<span id="maxLevelDisplay"></span>)</label></div>
+  <div class="settings-row"><input type="number" id="jumpLevelInput" min="1" style="width:80px;font:16px Arial;padding:8px 12px;border-radius:6px;border:1px solid #556688;background:#1a1a2e;color:#fff;text-align:center"></div>
+  <div class="settings-row"><label>跳转至波次 (1-3)</label></div>
+  <div class="settings-row"><input type="number" id="jumpWaveInput" min="1" max="3" value="1" style="width:80px;font:16px Arial;padding:8px 12px;border-radius:6px;border:1px solid #556688;background:#1a1a2e;color:#fff;text-align:center"></div>
+  <div class="settings-row">
+    <button class="menu-btn sm" id="jumpSubmit">跳转</button>
+    <button class="menu-btn sm outline" id="jumpCancel">取消</button>
+  </div>
+</div>
+
 <div class="overlay hidden" id="settingsOverlay">
   <div class="settings-title">设 置</div>
   <div class="settings-row"><label>音效</label><button class="menu-btn sm on" id="sndToggle">开启</button></div>
   <div class="settings-row"><label>背景音乐</label><button class="menu-btn sm on" id="bgmToggle">开启</button></div>
   <div class="settings-row"><label>背景音乐音量</label><input type="range" id="bgmVolume" min="0" max="100" value="40" style="width:160px"></div>
   <div class="settings-row"><label>震动反馈</label><button class="menu-btn sm off" id="vibToggle">关闭</button></div>
+  <div class="settings-row"><button class="menu-btn sm outline" id="devBtn">开发者选项</button></div>
   <div class="settings-divider"></div>
   <div class="settings-row">
     <button class="menu-btn sm" id="contBtn">继续游戏</button>
@@ -123,7 +147,7 @@ canvas{display:block;width:100%;height:100%;cursor:crosshair}
     <button class="menu-btn sm outline" id="homeBtn">返回主页</button>
   </div>
   <div class="settings-divider"></div>
-  <div style="color:#556688;font:13px 'Microsoft YaHei',sans-serif;text-align:center">开发者: iggy<br>v2.8 · 2026</div>
+  <div style="color:#556688;font:13px 'Microsoft YaHei',sans-serif;text-align:center">开发者: iggy<br>v2.9 · 2026</div>
 </div>
 
 <script>
@@ -148,7 +172,7 @@ function loadAlienSprite(cb){
     cx.putImageData(d,0,0);alienSprite=c;if(cb)cb();
   };
   img.onerror=()=>{if(cb)cb();};
-  img.src='参考外星人.png';
+  img.src='外星人.png';
 }
 
 // ============================================================
@@ -156,7 +180,7 @@ function loadAlienSprite(cb){
 // ============================================================
 const bgImages={};
 function loadBgImages(cb){
-  const files=['游戏背景1.png','游戏背景2.png','游戏背景3.png'];
+  const files=['游戏背景1.png','游戏背景2.png','游戏背景3.png','游戏背景4.png'];
   let loaded=0;
   files.forEach(fn=>{
     const img=new Image();
@@ -178,6 +202,7 @@ const LV=[
   {name:'城市街道',bg:'游戏背景1.png',cols:['#3b3b4e','#2d2d44','#ffff66'],spd:1},
   {name:'公园绿地',bg:'游戏背景2.png',cols:['#2a4a2a','#3a5a3a','#ffff66'],spd:1.15},
   {name:'森林深处',bg:'游戏背景3.png',cols:['#1a2a14','#2a3a24','#ffff66'],spd:1.35},
+  {name:'工厂废墟',bg:'游戏背景4.png',cols:['#2a2a2a','#1a1a1a','#ffff66'],spd:1.55},
 ];
 
 // ============================================================
@@ -185,7 +210,7 @@ const LV=[
 // ============================================================
 const $=id=>document.getElementById(id);
 const CV=$('game'),CX=CV.getContext('2d');
-const ov={menu:$('menuOverlay'),go:$('gameOverlay'),win:$('winOverlay'),settings:$('settingsOverlay')};
+const ov={menu:$('menuOverlay'),go:$('gameOverlay'),win:$('winOverlay'),settings:$('settingsOverlay'),password:$('passwordOverlay'),jump:$('jumpOverlay')};
 const T={el:$('levelToast'),name:$('toastName'),wave:$('toastWave')};
 const helpPanel=$('helpPanel');
 let settingsOpen=false,helpOpen=false;
@@ -395,8 +420,12 @@ function startInitialWave(){
 }
 
 function restartLevel(){
+  const currentLevel = S.levelIdx;
+  const currentWave = S.wave;
   resetCounters();
-  S.phase='playing';S.mode='overview';startBGM();
+  S.levelIdx = currentLevel;
+  S.wave = currentWave;
+  S.phase='playing';S.mode='overview';startBGM(S.levelIdx);
   ov.go.classList.add('hidden');ov.win.classList.add('hidden');ov.settings.classList.add('hidden');
   settingsOpen=false;helpOpen=false;helpPanel.classList.remove('show');
   const l=LV[S.levelIdx];T.name.textContent=l.name;T.wave.textContent='第 '+S.wave+' 波 | 消灭所有目标';T.el.classList.add('show');
@@ -661,6 +690,72 @@ loadBgImages(()=>{console.log('Background images loaded');checkReady();});
 setTimeout(()=>{
   if(resourcesLoaded<2){console.log('Fallback start');requestAnimationFrame(loop);}
 },3000);
+
+const DEV_PASSWORD='123456';
+let devUnlocked=false;
+
+function openPasswordModal(){
+  closeSettings();
+  devUnlocked=false;
+  $('devPassword').value='';
+  ov.password.classList.remove('hidden');
+  $('devPassword').focus();
+}
+
+function closePasswordModal(){
+  ov.password.classList.add('hidden');
+}
+
+function openJumpModal(){
+  ov.password.classList.add('hidden');
+  $('currentLevelDisplay').textContent=LV[S.levelIdx].name+' (第'+S.wave+'波)';
+  $('maxLevelDisplay').textContent=LV.length;
+  $('jumpLevelInput').value=S.levelIdx+1;
+  $('jumpLevelInput').max=LV.length;
+  $('jumpWaveInput').value=S.wave;
+  ov.jump.classList.remove('hidden');
+  $('jumpLevelInput').focus();
+  $('jumpLevelInput').select();
+}
+
+function closeJumpModal(){
+  ov.jump.classList.add('hidden');
+}
+
+function doJumpLevel(){
+  const levelIdx=parseInt($('jumpLevelInput').value)-1;
+  const wave=parseInt($('jumpWaveInput').value);
+  if(isNaN(levelIdx)||levelIdx<0||levelIdx>=LV.length){
+    alert('无效的关卡号！');
+    return;
+  }
+  if(isNaN(wave)||wave<1||wave>3){
+    alert('无效的波次号！');
+    return;
+  }
+  closeJumpModal();
+  S.levelIdx=levelIdx;
+  S.wave=wave;
+  S.lastWave=wave;
+  restartLevel();
+}
+
+$('devBtn').addEventListener('click',openPasswordModal);
+$('passwordSubmit').addEventListener('click',()=>{
+  if($('devPassword').value===DEV_PASSWORD){
+    devUnlocked=true;
+    openJumpModal();
+  }else{
+    alert('密码错误！');
+    $('devPassword').value='';
+  }
+});
+$('passwordCancel').addEventListener('click',closePasswordModal);
+$('devPassword').addEventListener('keydown',e=>{if(e.key==='Enter')$('passwordSubmit').click();});
+$('jumpSubmit').addEventListener('click',doJumpLevel);
+$('jumpCancel').addEventListener('click',closeJumpModal);
+$('jumpLevelInput').addEventListener('keydown',e=>{if(e.key==='Enter')$('jumpSubmit').click();});
+$('jumpWaveInput').addEventListener('keydown',e=>{if(e.key==='Enter')$('jumpSubmit').click();});
 </script>
 </body>
 </html>
